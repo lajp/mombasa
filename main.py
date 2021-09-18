@@ -25,10 +25,10 @@ class MyClient(discord.Client):
     async def on_ready(self):
         print('Logged on as {0}!'.format(self.user))
         self.prefix = "?"
-        self.player = None
         self.queue = []
         self.looping = False
         self.current = None
+        self.skipped = False
 
     async def on_message(self, message):
         if(message.author.id == self.user.id):
@@ -87,8 +87,9 @@ class MyClient(discord.Client):
 
             if(command == "skip" or command == "s"):
                 if self.voice_clients[0].is_playing():
-                    self.voice_clients[0].stop()
                     self.current = None
+                    self.skipped = True
+                    self.voice_clients[0].stop()
                     return await message.channel.send("Skipped!")
                 return await message.channel.send("Nothing's playing!")
 
@@ -110,22 +111,23 @@ class MyClient(discord.Client):
                 return await message.channel.send("Looping enabled!")
 
     def play_queue(self, *args):
-        if(self.queue != [] or self.looping):
-            while len(self.queue) == 0:
-                time.sleep(10)
-            while self.voice_clients[0].is_playing():
-                time.sleep(0.5)
-            if not self.looping:
-                if(self.queue != []):
-                    try:
-                        data = self.queue.pop(0)
-                        self.current = data
-                    except:
-                        return
+        if(self.voice_clients[0].is_playing()):
+            return
+        if(self.current == None and not self.skipped):
+            return
+        if (not self.looping) or self.current == None:
+            self.skipped = False
+            if(self.queue != []):
+                try:
+                    data = self.queue.pop(0)
+                    self.current = data
+                except:
+                    return
             else:
-                data = self.current
-            self.loop.run_in_executor(None, self.play(data))
-        return
+                return
+        else:
+            data = self.current
+        return self.loop.run_in_executor(None, self.play, data)
 
     def play(self, data):
         try:
@@ -133,11 +135,8 @@ class MyClient(discord.Client):
         except:
             return -1
         player = discord.FFmpegPCMAudio(filename, **ffmpeg_options)
-        self.voice_clients[0].play(player, after=self.play_queue)
-        return
+        return self.voice_clients[0].play(player, after=self.play_queue)
 
-    async def on_player_stop(self, node, payload):
-        await play_queue()
 
     async def join(self, channel):
         if(self.voice_clients != []):
