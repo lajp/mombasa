@@ -5,7 +5,7 @@ ytdl_format_options = {
     "outtmpl": "%(extractor)s-%(id)s-%(title)s.%(ext)s",
     "restrictfilenames": True,
     "nocheckcertificate": True,
-    "ignoreerrors": False,
+    "ignoreerrors": True,
     "logtostderr": False,
     "quiet": True,
     "no_warnings": True,
@@ -57,18 +57,40 @@ class MyClient(discord.Client):
                     data = ytdl.extract_info(query, download=False)
                 except Exception as error:
                     return await message.channel.send("Ran into an error while processing the request: {}".format(repr(error)))
-                if "entries" in data:
-                    data = data["entries"][0]
-                if not "title" in data:
-                    print(data)
-                    return await message.channel.send("We ran into an unknown error while processing the request")
-                if(self.voice_clients[0].is_playing()):
-                    self.queue.append(data)
-                    return await message.channel.send("`{0}` has been put in the queue and it's currently on the position #{1}".format(data["title"], len(self.queue)))
+                if data["_type"] == "playlist" and len(data["entries"]) > 1:
+                    started = self.voice_clients[0].is_playing()
+                    oldstarted = 0
+                    for entry in data["entries"]:
+                        if not "title" in entry:
+                            print(entry)
+                            continue
+                        if not started:
+                            self.current = entry
+                            self.play(entry.copy())
+                            await message.channel.send("Started playing `{}`!".format(entry["title"]))
+                            started = True
+                            oldstarted = 1
+                        else:
+                            self.queue.append(entry)
+                    if(not "title" in data):
+                        title = "an unknown playlist"
+                    else:
+                        title = data["title"]
+                    return await message.channel.send("Enqueued `{0}` tracks from playlist `{1}`".format(len(data["entries"])-oldstarted, title))
                 else:
-                    self.current = data
-                    self.play(data.copy())
-                    return await message.channel.send("Started playing {}".format(data["title"]))
+                    if "entries" in data:
+                        data = data["entries"][0]
+                    if not "title" in data:
+                        print(data)
+                        return await message.channel.send("We ran into an unknown error while processing the request")
+                    if(self.voice_clients[0].is_playing()):
+                        self.queue.append(data)
+                        return await message.channel.send("`{0}` has been put in the queue and it's currently on the position #{1}".format(data["title"], len(self.queue)))
+                    else:
+                        self.current = data
+                        self.play(data.copy())
+                        return await message.channel.send("Started playing {}".format(data["title"]))
+
 
             if(command == "disconnect" or command == "dis"):
                 await self.leave()
@@ -76,12 +98,17 @@ class MyClient(discord.Client):
             if(command == "q" or command == "queue"):
                 if(self.queue == []):
                     return await message.channel.send("The queue is empy.")
-                embed=discord.Embed(title="The queue", color=discord.Color.blue())
-                for kappale in self.queue:
-                    minutes = math.floor(kappale["duration"]/60)
-                    seconds = kappale["duration"]-(minutes*60)
-                    embed.add_field(name="{0}. {1} ({2}:{3} min)".format(self.queue.index(kappale)+1, kappale["title"], minutes, seconds),
-                            value="[Link to the video](https://www.youtube.com/watch?v={})".format(kappale["id"]), inline=False)
+                embed=discord.Embed(title="The queue ({0} tracks in total)".format(len(self.queue)), color=discord.Color.blue())
+                try:
+                    en = int(message.content.split()[1])-1
+                except:
+                    en = 0
+                for i in range(en*10, min(en*10+10, len(self.queue))):
+                    minutes = math.floor(self.queue[i]["duration"]/60)
+                    seconds = self.queue[i]["duration"]-(minutes*60)
+                    embed.add_field(name="{0}. {1} ({2}:{3} min)".format(self.queue.index(self.queue[i])+1, self.queue[i]["title"], minutes, seconds),
+                            value="[Link to the video](https://www.youtube.com/watch?v={})".format(self.queue[i]["id"]), inline=False)
+                embed.set_footer(text="Page {0}/{1}".format(en+1, math.ceil(len(self.queue)/10)))
 
                 return await message.channel.send(embed=embed)
 
