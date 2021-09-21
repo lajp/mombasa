@@ -91,6 +91,24 @@ class MyClient(discord.Client):
                         self.play(data.copy())
                         return await message.channel.send("Started playing {}".format(data["title"]))
 
+            if(command == "mombasa"):
+                if(message.author.voice is None):
+                    return await message.reply("You are not connected to a voice channel!")
+                channel = message.author.voice.channel
+                await self.join(channel)
+                self.looping = True
+                mombasa = ytdl.extract_info("https://www.youtube.com/watch?v=EFrrEUNlH0c", download=False)
+                self.queue = []
+                if(self.voice_clients[0].is_playing()):
+                    self.voice_clients[0].stop()
+                self.current = mombasa
+                self.play(mombasa.copy())
+                return await message.channel.send("Jäi Mombasaan, vain päivä elämää! Ja elämään, nyt Mombasa vain jää! :notes:")
+
+            if(command == "np"):
+                if(self.voice_clients[0].is_playing()):
+                    return await message.channel.send("Now playing `{}`".format(self.current["title"]))
+                return await message.channel.send("Nothing's playing right now!")
 
             if(command == "disconnect" or command == "dis"):
                 await self.leave()
@@ -130,12 +148,40 @@ class MyClient(discord.Client):
                 self.queue = []
                 return await message.channel.send("Queue cleared!")
 
+            if(command == "rm" or command == "remove"):
+                try:
+                    index = int(message.content.split()[1])-1
+                    entry = self.queue.pop(index)
+                except:
+                    return await message.channel.send("Please provide a valid index!")
+                return await message.channel.send("Removed {} from the queue!".format(entry["title"]))
+
             if(command == "loop"):
                 if(self.looping):
                     self.looping = False
                     return await message.channel.send("Looping disabled!")
                 self.looping = True
                 return await message.channel.send("Looping enabled!")
+
+            if(command == "prefix"):
+                try:
+                    newprefix = message.content.split()[1]
+                except:
+                    return await message.channel.send("Please give a valid prefix")
+                self.prefix = newprefix
+                return await message.channel.send("Prefix set to `{}`!".format(self.prefix))
+
+            if(command == "skipto" or command == "st"):
+                try:
+                    index = int(message.content.split()[1])
+                    if(len(self.queue) < index):
+                        raise IndexError
+                except:
+                    return await message.channel.send("Please give a valid index")
+                self.queue = self.queue[index-1:]
+                self.voice_clients[0].stop()
+                return await message.channel.send("Skipped `{}` elements in the queue".format(index))
+
 
     def play_queue(self, *args):
         try:
