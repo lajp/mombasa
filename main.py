@@ -111,7 +111,10 @@ class MyClient(discord.Client):
                 return await message.channel.send("Looping enabled!")
 
     def play_queue(self, *args):
-        if(self.voice_clients[0].is_playing()):
+        try:
+            if(self.voice_clients[0].is_playing()):
+                return
+        except IndexError:
             return
         if(self.current == None and not self.skipped):
             return
@@ -148,6 +151,7 @@ class MyClient(discord.Client):
     async def leave(self):
         if(self.voice_clients != []):
             for vc in self.voice_clients:
+                vc.stop()
                 await vc.disconnect()
         return
 
