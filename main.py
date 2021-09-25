@@ -57,7 +57,7 @@ class MyClient(discord.Client):
                     data = ytdl.extract_info(query, download=False)
                 except Exception as error:
                     return await message.channel.send("Ran into an error while processing the request: {}".format(repr(error)))
-                if data["_type"] == "playlist" and len(data["entries"]) > 1:
+                if "_type" in data and data["_type"] == "playlist" and len(data["entries"]) > 1:
                     started = self.voice_clients[0].is_playing()
                     oldstarted = 0
                     for entry in data["entries"]:
